@@ -37,6 +37,7 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
+import yuni.oss.YuniOSS;
 
 /**
  * Created by zhouzhuo on 11/22/15.
@@ -116,21 +117,30 @@ public class OSSRequestTask<T extends OSSResult> implements Callable<T> {
                     InputStream inputStream = null;
                     String stringBody = null;
                     long length = 0;
-                    if (message.getUploadData() != null) {
-                        inputStream = new ByteArrayInputStream(message.getUploadData());
-                        length = message.getUploadData().length;
-                    } else if (message.getUploadFilePath() != null) {
-                        File file = new File(message.getUploadFilePath());
-                        inputStream = new FileInputStream(file);
-                        length = file.length();
-                        if (length <= 0) {
-                            throw new ClientException("the length of file is 0!");
+
+                    // 如果有与你的处理则使用与你的
+                    if (YuniOSS.uploadDelegate != null) {
+                        inputStream = YuniOSS.uploadDelegate.getUploadInputStream(message);
+                        length = YuniOSS.uploadDelegate.getContentLength(message);
+                    }
+
+                    if (inputStream == null) {
+                        if (message.getUploadData() != null) {
+                            inputStream = new ByteArrayInputStream(message.getUploadData());
+                            length = message.getUploadData().length;
+                        } else if (message.getUploadFilePath() != null) {
+                            File file = new File(message.getUploadFilePath());
+                            inputStream = new FileInputStream(file);
+                            length = file.length();
+                            if (length <= 0) {
+                                throw new ClientException("the length of file is 0!");
+                            }
+                        } else if (message.getContent() != null) {
+                            inputStream = message.getContent();
+                            length = message.getContentLength();
+                        } else {
+                            stringBody = message.getStringBody();
                         }
-                    } else if (message.getContent() != null) {
-                        inputStream = message.getContent();
-                        length = message.getContentLength();
-                    } else {
-                        stringBody = message.getStringBody();
                     }
 
                     if (inputStream != null) {
